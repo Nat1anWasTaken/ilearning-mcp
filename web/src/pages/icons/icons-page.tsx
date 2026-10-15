@@ -17,13 +17,13 @@ type IconFile = { path: string; format: string; size: string }
 const PNG_SIZES = [16, 32, 48, 64, 128, 256, 512]
 
 const ICON_FILES: IconFile[] = [
-  { path: "/icons/ilearning.svg", format: "SVG", size: "Any" },
+  { path: "/icon-files/ilearning.svg", format: "SVG", size: "Any" },
   ...PNG_SIZES.map((size) => ({
-    path: `/icons/ilearning-${size}.png`,
+    path: `/icon-files/ilearning-${size}.png`,
     format: "PNG",
     size: `${size} × ${size}`,
   })),
-  { path: "/icons/ilearning.ico", format: "ICO", size: "16 – 256" },
+  { path: "/icon-files/ilearning.ico", format: "ICO", size: "16 – 256" },
 ]
 
 export function IconsPage() {

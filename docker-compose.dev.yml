@@ -1,0 +1,14 @@
+# Local development database: `docker compose -f docker-compose.dev.yml up -d`
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: ilearning_mcp
+      POSTGRES_PASSWORD: ilearning_mcp
+      POSTGRES_DB: ilearning_mcp
+    ports:
+      - "5443:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+volumes:
+  pgdata:

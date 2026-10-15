@@ -1,0 +1,42 @@
+# Production stack for Dokploy. Dokploy writes the service's environment to
+# .env next to this file; see .env.example for the variables.
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    # Shutdown drains in-flight tool calls (file uploads and text extraction
+    # can take a while).
+    stop_grace_period: 30s
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://ilearning_mcp:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@postgres:5432/ilearning_mcp
+    depends_on:
+      postgres:
+        condition: service_healthy
+    expose:
+      - "8080"
+    networks:
+      - default
+      - dokploy-network
+
+  postgres:
+    image: postgres:17
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ilearning_mcp
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      POSTGRES_DB: ilearning_mcp
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ilearning_mcp -d ilearning_mcp"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pgdata:
+
+networks:
+  dokploy-network:
+    external: true

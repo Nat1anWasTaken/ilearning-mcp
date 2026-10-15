@@ -1,0 +1,6 @@
+/target
+.env
+.token.json
+/scratch
+node_modules
+/web/dist

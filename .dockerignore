@@ -1,0 +1,8 @@
+target
+.env
+.git
+.token.json
+scratch
+docker-compose*.yml
+web/node_modules
+web/dist

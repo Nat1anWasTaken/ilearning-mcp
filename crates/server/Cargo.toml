@@ -1,0 +1,38 @@
+[package]
+name = "ilearning-mcp"
+description = "Remote MCP server that lets AI agents use CYCU i-learning 2.0 on behalf of each student"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+moodle.workspace = true
+anyhow.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+futures.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+uuid.workspace = true
+chrono.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+dashmap.workspace = true
+base64.workspace = true
+rand.workspace = true
+sha2.workspace = true
+hmac.workspace = true
+url.workspace = true
+percent-encoding.workspace = true
+time.workspace = true
+sqlx.workspace = true
+axum.workspace = true
+axum-extra.workspace = true
+tower.workspace = true
+tower-http.workspace = true
+reqwest = { workspace = true, features = ["stream"] }
+rmcp.workspace = true
+schemars.workspace = true
+dotenvy.workspace = true
+jsonwebtoken.workspace = true
+aes-gcm.workspace = true

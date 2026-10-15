@@ -2,6 +2,7 @@ import {
   ActivityIcon,
   BotIcon,
   HouseIcon,
+  ImageIcon,
   PlugIcon,
   type LucideIcon,
 } from "lucide-react"
@@ -27,6 +28,7 @@ const NAV_ITEMS: NavItem[] = [
   { to: "/sessions", label: "Connected clients", icon: BotIcon },
   { to: "/activity", label: "Activity", icon: ActivityIcon },
   { to: "/connect", label: "Connect", icon: PlugIcon },
+  { to: "/icons", label: "Icons", icon: ImageIcon },
 ]
 
 export function AppSidebar() {

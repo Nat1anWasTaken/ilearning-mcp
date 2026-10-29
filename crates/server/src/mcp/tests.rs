@@ -131,7 +131,7 @@ async fn initialize_and_tools_list(db: PgPool) {
 
     let listed = harness.rpc("tools/list", json!({})).await;
     let tools = listed["result"]["tools"].as_array().unwrap();
-    assert_eq!(tools.len(), 19);
+    assert_eq!(tools.len(), 20);
     let tool = |name: &str| tools.iter().find(|tool| tool["name"] == name).unwrap();
     assert_eq!(tool("list_courses")["annotations"]["readOnlyHint"], true);
     assert_eq!(

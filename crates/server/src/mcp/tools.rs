@@ -253,8 +253,21 @@ static TOOLS: LazyLock<Vec<Tool>> = LazyLock::new(|| {
             "Read a course file",
             "Reads an iLearning file by its `fileurl`: text of PDF, Word, PowerPoint, Excel and \
              text files (up to `max_chars`), images as images, and a download link valid for \
-             one hour for anything else.",
+             one hour for anything else. With mode=\"link\" it returns that download link for \
+             any file, to get the original bytes (e.g. to convert a document, or when its text \
+             misses equations, images or layout).",
             |a: Account, r: ReadFileRequest| async move { a.read_file(r).await },
+        ),
+        Tool::new(
+            "download_file",
+            Read,
+            "Download a course file",
+            "Returns an iLearning file's original bytes by its `fileurl`, base64-encoded as an \
+             embedded resource, for agents that cannot fetch the link from read_file with \
+             mode=\"link\". Returns up to `max_bytes` from `offset`; while `next_offset` is not \
+             null, call again with offset=next_offset and join the parts. Prefer read_file \
+             for the text, and a download link when you can fetch URLs: base64 is large.",
+            |a: Account, r: DownloadFileRequest| async move { a.download_file(r).await },
         ),
         Tool::new(
             "submit_assignment",
@@ -331,7 +344,7 @@ mod tests {
     #[test]
     fn every_tool_has_an_object_schema() {
         let names: Vec<_> = all().map(|tool| tool.name).collect();
-        assert_eq!(names.len(), 19);
+        assert_eq!(names.len(), 20);
         for tool in all() {
             let definition = tool.definition();
             assert_eq!(definition.input_schema["type"], "object", "{}", tool.name);

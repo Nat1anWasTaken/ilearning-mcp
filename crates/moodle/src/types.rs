@@ -183,7 +183,8 @@ pub struct ModuleRequest {
 
 /// Read a file from iLearning: text of PDF, Word, PowerPoint, Excel, text
 /// and HTML files; images are returned as images; other files (videos,
-/// legacy .ppt/.doc, archives) as a download link.
+/// legacy .ppt/.doc, archives) as a download link. With `mode: "link"`,
+/// always a download link to the original file.
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
 pub struct ReadFileRequest {
     /// A `fileurl` from another tool's result (an iLearning
@@ -193,6 +194,37 @@ pub struct ReadFileRequest {
     #[serde(default = "default_max_chars")]
     #[schemars(range(min = 1))]
     pub max_chars: u32,
+    /// `text` (default): the file's content where it can be read. `link`:
+    /// a download link to the original bytes, e.g. to convert the file or
+    /// when the extracted text misses equations or images.
+    #[serde(default)]
+    pub mode: ReadMode,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum ReadMode {
+    #[default]
+    Text,
+    Link,
+}
+
+/// Get a file's original bytes, base64-encoded in the result, for agents
+/// that cannot fetch a download link. Large files come in parts: call again
+/// with `offset` set to the previous result's `next_offset` until it is
+/// null.
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
+pub struct DownloadFileRequest {
+    /// A `fileurl` from another tool's result (an iLearning
+    /// `pluginfile.php` URL).
+    pub file_url: String,
+    /// Byte to start at. Default 0.
+    #[serde(default)]
+    pub offset: u64,
+    /// Most bytes to return (1-4194304). Default 1048576.
+    #[serde(default = "default_max_bytes")]
+    #[schemars(range(min = 1, max = 4194304))]
+    pub max_bytes: u32,
 }
 
 /// Save the user's submission for an assignment: online text and/or files.
@@ -275,6 +307,10 @@ fn default_max_chars() -> u32 {
     100_000
 }
 
+fn default_max_bytes() -> u32 {
+    1024 * 1024
+}
+
 #[cfg(test)]
 mod tests {
     use serde_json::json;
@@ -291,7 +327,12 @@ mod tests {
             serde_json::from_value(json!({"classification": "past"})).unwrap();
         assert_eq!(r.classification.as_str(), "past");
         let r: ReadFileRequest = serde_json::from_value(json!({"file_url": "x"})).unwrap();
-        assert_eq!(r.max_chars, 100_000);
+        assert_eq!((r.max_chars, r.mode), (100_000, ReadMode::Text));
+        let r: ReadFileRequest =
+            serde_json::from_value(json!({"file_url": "x", "mode": "link"})).unwrap();
+        assert_eq!(r.mode, ReadMode::Link);
+        let r: DownloadFileRequest = serde_json::from_value(json!({"file_url": "x"})).unwrap();
+        assert_eq!((r.offset, r.max_bytes), (0, 1024 * 1024));
         let r: SubmitAssignmentRequest =
             serde_json::from_value(json!({"assignment_id": 3})).unwrap();
         assert!(!r.submit_for_grading && r.files.is_empty() && r.online_text.is_none());

@@ -28,7 +28,7 @@ mod tests {
         )
         .await
         .json();
-        assert_eq!(tools.as_array().unwrap().len(), 19);
+        assert_eq!(tools.as_array().unwrap().len(), 20);
         assert_eq!(
             tools[0],
             json!({

@@ -209,6 +209,24 @@ pub enum ReadMode {
     Link,
 }
 
+/// Get a file's original bytes, base64-encoded in the result, for agents
+/// that cannot fetch a download link. Large files come in parts: call again
+/// with `offset` set to the previous result's `next_offset` until it is
+/// null.
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
+pub struct DownloadFileRequest {
+    /// A `fileurl` from another tool's result (an iLearning
+    /// `pluginfile.php` URL).
+    pub file_url: String,
+    /// Byte to start at. Default 0.
+    #[serde(default)]
+    pub offset: u64,
+    /// Most bytes to return (1-4194304). Default 1048576.
+    #[serde(default = "default_max_bytes")]
+    #[schemars(range(min = 1, max = 4194304))]
+    pub max_bytes: u32,
+}
+
 /// Save the user's submission for an assignment: online text and/or files.
 /// Files replace all previously submitted files. Optionally submit it for
 /// grading, after which it usually cannot be changed.
@@ -289,6 +307,10 @@ fn default_max_chars() -> u32 {
     100_000
 }
 
+fn default_max_bytes() -> u32 {
+    1024 * 1024
+}
+
 #[cfg(test)]
 mod tests {
     use serde_json::json;
@@ -309,6 +331,8 @@ mod tests {
         let r: ReadFileRequest =
             serde_json::from_value(json!({"file_url": "x", "mode": "link"})).unwrap();
         assert_eq!(r.mode, ReadMode::Link);
+        let r: DownloadFileRequest = serde_json::from_value(json!({"file_url": "x"})).unwrap();
+        assert_eq!((r.offset, r.max_bytes), (0, 1024 * 1024));
         let r: SubmitAssignmentRequest =
             serde_json::from_value(json!({"assignment_id": 3})).unwrap();
         assert!(!r.submit_for_grading && r.files.is_empty() && r.online_text.is_none());

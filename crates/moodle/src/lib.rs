@@ -33,7 +33,10 @@ use tokio::sync::OnceCell;
 use url::Url;
 
 pub use error::{Error, Result};
-pub use files::{Download, FileContent, MAX_IMAGE_BYTES, UploadFile, file_name_and_mime};
+pub use files::{
+    Download, FileChunk, FileContent, MAX_CHUNK_BYTES, MAX_IMAGE_BYTES, UploadFile,
+    file_name_and_mime,
+};
 pub use link::Tokens;
 
 /// User agent for every request. Moodle only issues autologin keys to

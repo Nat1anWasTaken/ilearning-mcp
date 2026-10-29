@@ -21,7 +21,8 @@ get_notifications. get_course_contents lists a course's sections and modules (cm
 file URLs); get_module reads a page/url/resource/label module; read_file extracts the text of \
 a course file (PDF, Word, PowerPoint, Excel, text), returns images, or gives a short-lived \
 download link for other files; read_file with mode=\"link\" gives that link for any file, to \
-get its original bytes. Assignments: list_assignments, then get_assignment_status for \
+get its original bytes, and download_file returns those bytes inline (base64, in parts) for \
+agents without network access. Assignments: list_assignments, then get_assignment_status for \
 one assignment's submission and feedback. Forums: list_forum_discussions, then \
 get_discussion_posts. get_grades without course_id gives the overview, with it the course's \
 grade items. Messages: list_conversations, get_conversation_messages.

@@ -1,8 +1,8 @@
 //! Turning operation results into MCP tool results.
 
 use base64::{Engine, engine::general_purpose::STANDARD};
-use moodle::FileContent;
-use rmcp::model::{CallToolResult, ContentBlock};
+use moodle::{FileChunk, FileContent};
+use rmcp::model::{CallToolResult, ContentBlock, ResourceContents};
 use serde_json::{Value, json};
 
 use super::log;
@@ -11,6 +11,7 @@ use super::log;
 pub enum Output {
     Json(Value),
     File(FileContent),
+    Bytes(FileChunk),
 }
 
 impl Output {
@@ -69,6 +70,32 @@ impl Output {
                 );
                 (success(text), Some(logged))
             }
+            Self::Bytes(FileChunk {
+                filename,
+                mime,
+                file_url,
+                size,
+                offset,
+                bytes,
+                next_offset,
+            }) => {
+                let header = json!({
+                    "filename": filename,
+                    "mime": mime,
+                    "size": size,
+                    "offset": offset,
+                    "length": bytes.len(),
+                    "next_offset": next_offset,
+                    "encoding": "base64",
+                });
+                let blob =
+                    ResourceContents::blob(STANDARD.encode(&bytes), file_url).with_mime_type(mime);
+                let result = CallToolResult::success(vec![
+                    ContentBlock::text(header.to_string()),
+                    ContentBlock::resource(blob),
+                ]);
+                (result, Some(header))
+            }
         }
     }
 }
@@ -100,6 +127,12 @@ impl IntoOutput for Value {
 impl IntoOutput for FileContent {
     fn into_output(self) -> Output {
         Output::File(self)
+    }
+}
+
+impl IntoOutput for FileChunk {
+    fn into_output(self) -> Output {
+        Output::Bytes(self)
     }
 }
 
@@ -160,5 +193,29 @@ mod tests {
             Output::File(file).into_parts(|url| format!("https://mcp.example/files/x?{url}"));
         assert!(text(&result, 0).contains("https://mcp.example/files/x?"));
         assert_eq!(logged.unwrap()["filename"], "a.ppt");
+
+        let chunk = FileChunk {
+            filename: "a.docx".into(),
+            mime: "application/octet-stream".into(),
+            file_url: "https://ilearning.example/webservice/pluginfile.php/1/a.docx".into(),
+            size: Some(10),
+            offset: 4,
+            bytes: vec![1, 2, 3],
+            next_offset: Some(7),
+        };
+        let (result, logged) = Output::Bytes(chunk).into_parts(no_link);
+        let resource = result.content[1].as_resource().unwrap();
+        let ResourceContents::BlobResourceContents { blob, .. } = &resource.resource else {
+            panic!("not a blob");
+        };
+        assert_eq!(blob, "AQID");
+        assert_eq!(
+            logged,
+            Some(json!({
+                "filename": "a.docx", "mime": "application/octet-stream", "size": 10,
+                "offset": 4, "length": 3, "next_offset": 7, "encoding": "base64",
+            }))
+        );
+        assert_eq!(text(&result, 0), logged.unwrap().to_string());
     }
 }

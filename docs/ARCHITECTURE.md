@@ -137,6 +137,7 @@ include ids needed for follow-up calls, unix times → RFC 3339).
 | `get_conversation_messages` | read | `get_conversation_messages(ConversationRequest{conversation_id, limit?})` → `core_message_get_conversation_messages` |
 | `get_module` | read | `get_module(ModuleRequest{course_id, cmid})` → page/url/resource/label body: `mod_page_get_pages_by_courses`, `mod_url_get_urls_by_courses`, `mod_resource_get_resources_by_courses` (filter by `coursemodule`) |
 | `read_file` | read | `read_file(ReadFileRequest{file_url, max_chars?, mode: text|link = text})` → `FileContent` (see below) |
+| `download_file` | read | `download_file(DownloadFileRequest{file_url, offset: u64 = 0, max_bytes: u32 = 1 MiB (≤ 4 MiB)})` → `FileChunk` (see below) |
 | `submit_assignment` | write | `submit_assignment(SubmitAssignmentRequest{assignment_id, online_text?, files?: [{filename, text?, base64?}], submit_for_grading: bool = false})` → `upload.php` + `mod_assign_save_submission` (+ `mod_assign_submit_for_grading` with `acceptsubmissionstatement=1`) |
 | `reply_forum_post` | write | `reply_forum_post(ReplyRequest{post_id, subject?, message})` → `mod_forum_add_discussion_post` |
 | `create_forum_discussion` | write | `create_forum_discussion(NewDiscussionRequest{forum_id, subject, message})` → `mod_forum_add_discussion` |
@@ -154,6 +155,13 @@ file_url}` otherwise (e.g. legacy .ppt/.doc), and for every file with
 link `<PUBLIC_URL>/files/<signed>` (HMAC with a key derived from
 `ENCRYPTION_KEY`, payload `{user_id, file_url, exp: now+1h}`) that streams via
 `Account::download`.
+
+`download_file` is for agents that cannot fetch that link: it asks iLearning
+for `Range: bytes=offset-(offset+max_bytes)` (or skips `offset` bytes of a 200
+response) and returns `FileChunk {filename, mime, file_url, size?, offset,
+bytes, next_offset?}`; the extra byte tells whether `next_offset` is set. The
+server sends a JSON header and the bytes as an embedded base64 blob resource;
+the call log keeps only the header.
 
 ### `crates/moodle` public API (contract between the crates)
 

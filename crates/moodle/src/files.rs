@@ -3,7 +3,8 @@
 
 use std::io::{Cursor, Read};
 
-use reqwest::header::{CONTENT_DISPOSITION, CONTENT_TYPE};
+use reqwest::StatusCode;
+use reqwest::header::{CONTENT_DISPOSITION, CONTENT_RANGE, CONTENT_TYPE, RANGE};
 use reqwest::multipart::{Form, Part};
 use serde::Serialize;
 use serde_json::Value;
@@ -12,12 +13,14 @@ use url::Url;
 use crate::Account;
 use crate::error::{Error, Result};
 use crate::text::{self, Get};
-use crate::types::{ReadFileRequest, ReadMode};
+use crate::types::{DownloadFileRequest, ReadFileRequest, ReadMode};
 
 /// Largest image [`Account::read_file`] returns inline.
 pub const MAX_IMAGE_BYTES: usize = 5 * 1024 * 1024;
 /// Largest file [`Account::read_file`] downloads to extract text.
 const MAX_EXTRACT_BYTES: u64 = 50 * 1024 * 1024;
+/// Largest part [`Account::download_file`] returns.
+pub const MAX_CHUNK_BYTES: u32 = 4 * 1024 * 1024;
 
 /// A downloaded file.
 #[derive(Clone)]
@@ -33,6 +36,33 @@ impl std::fmt::Debug for Download {
             .field("filename", &self.filename)
             .field("mime", &self.mime)
             .field("size", &self.bytes.len())
+            .finish()
+    }
+}
+
+/// Part of a file's original bytes, from [`Account::download_file`].
+#[derive(Clone)]
+pub struct FileChunk {
+    pub filename: String,
+    pub mime: String,
+    pub file_url: String,
+    /// The whole file's size, when iLearning reports it.
+    pub size: Option<u64>,
+    pub offset: u64,
+    pub bytes: Vec<u8>,
+    /// Where the next part starts; `None` at the end of the file.
+    pub next_offset: Option<u64>,
+}
+
+impl std::fmt::Debug for FileChunk {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("FileChunk")
+            .field("filename", &self.filename)
+            .field("mime", &self.mime)
+            .field("size", &self.size)
+            .field("offset", &self.offset)
+            .field("length", &self.bytes.len())
+            .field("next_offset", &self.next_offset)
             .finish()
     }
 }
@@ -90,8 +120,24 @@ impl Account {
     /// `pluginfile.php` are allowed; the token is added here. Use
     /// [`file_name_and_mime`] to describe the response.
     pub async fn download_response(&self, file_url: &str) -> Result<reqwest::Response> {
+        self.fetch(file_url, None).await
+    }
+
+    /// [`Self::download_response`], asking for `range` (inclusive) only.
+    /// iLearning may ignore the range and answer 200 with the whole file.
+    async fn fetch(&self, file_url: &str, range: Option<(u64, u64)>) -> Result<reqwest::Response> {
         let url = self.file_url(file_url)?;
-        let response = self.moodle.http.get(url).send().await?.error_for_status()?;
+        let mut request = self.moodle.http.get(url);
+        if let Some((first, last)) = range {
+            request = request.header(RANGE, format!("bytes={first}-{last}"));
+        }
+        let response = request.send().await?;
+        if response.status() == StatusCode::RANGE_NOT_SATISFIABLE {
+            return Err(Error::NotAllowed(
+                "offset is past the end of the file".into(),
+            ));
+        }
+        let response = response.error_for_status()?;
         let is_json = response
             .headers()
             .get(CONTENT_TYPE)
@@ -139,6 +185,55 @@ impl Account {
             .extend_pairs(pairs)
             .append_pair("token", &self.token);
         Ok(url)
+    }
+
+    /// Returns up to `max_bytes` of a file's original bytes from `offset`,
+    /// for agents that cannot fetch a download link.
+    pub async fn download_file(&self, request: DownloadFileRequest) -> Result<FileChunk> {
+        let max = u64::from(request.max_bytes.clamp(1, MAX_CHUNK_BYTES));
+        let offset = request.offset;
+        // One byte more than asked tells whether the file goes on.
+        let mut response = self
+            .fetch(&request.file_url, Some((offset, offset + max)))
+            .await?;
+        let (filename, mime) = describe(&response);
+        let partial = response.status() == StatusCode::PARTIAL_CONTENT;
+        let size = if partial {
+            response
+                .headers()
+                .get(CONTENT_RANGE)
+                .and_then(|v| v.to_str().ok())
+                .and_then(content_range_total)
+        } else {
+            response.content_length()
+        };
+        let mut skip = if partial { 0 } else { offset };
+        let mut bytes = Vec::new();
+        while let Some(chunk) = response.chunk().await? {
+            let start = skip.min(chunk.len() as u64) as usize;
+            skip -= start as u64;
+            bytes.extend_from_slice(&chunk[start..]);
+            if bytes.len() as u64 > max {
+                break;
+            }
+        }
+        if bytes.is_empty() && offset > 0 {
+            return Err(Error::NotAllowed(
+                "offset is past the end of the file".into(),
+            ));
+        }
+        let more = bytes.len() as u64 > max;
+        bytes.truncate(max as usize);
+        let next_offset = more.then(|| offset + bytes.len() as u64);
+        Ok(FileChunk {
+            filename,
+            mime,
+            file_url: request.file_url,
+            size,
+            offset,
+            bytes,
+            next_offset,
+        })
     }
 
     /// Uploads files into one new draft area and returns its item id.
@@ -279,6 +374,11 @@ fn describe(response: &reqwest::Response) -> (String, String) {
                 .to_string()
         });
     (filename, mime)
+}
+
+/// The total size in a `Content-Range: bytes 0-99/1234` header.
+fn content_range_total(header: &str) -> Option<u64> {
+    header.rsplit_once('/')?.1.trim().parse().ok()
 }
 
 /// The file name in a `Content-Disposition` header. Moodle sends raw UTF-8
@@ -709,6 +809,96 @@ mod tests {
         assert!(matches!(error, Error::Http(_)));
         assert!(!error.to_string().contains("SECRETTOKEN"), "{error}");
         assert!(!format!("{error:?}").contains("SECRETTOKEN"));
+    }
+
+    /// Serves `body` as `a.bin` on 127.0.0.1, honoring `Range` only if
+    /// `ranges`.
+    async fn serve(body: &'static [u8], ranges: bool) -> Account {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let root = format!("http://{}", listener.local_addr().unwrap());
+        tokio::spawn(async move {
+            loop {
+                let (mut socket, _) = listener.accept().await.unwrap();
+                let mut request = vec![0; 4096];
+                let n = socket.read(&mut request).await.unwrap();
+                let request = String::from_utf8_lossy(&request[..n]).to_lowercase();
+                let range = request
+                    .lines()
+                    .find_map(|l| l.strip_prefix("range: bytes="))
+                    .and_then(|r| r.trim().split_once('-'))
+                    .map(|(a, b)| (a.parse::<usize>().unwrap(), b.parse::<usize>().unwrap()));
+                let head = "Content-Type: application/octet-stream\r\n\
+                    Content-Disposition: attachment; filename=\"a.bin\"\r\nConnection: close";
+                let response = match range.filter(|_| ranges) {
+                    Some((first, _)) if first >= body.len() => {
+                        format!("HTTP/1.1 416 Range Not Satisfiable\r\n{head}\r\n\r\n").into_bytes()
+                    }
+                    Some((first, last)) => {
+                        let last = last.min(body.len() - 1);
+                        let part = &body[first..=last];
+                        let mut r = format!(
+                            "HTTP/1.1 206 Partial Content\r\n{head}\r\n\
+                             Content-Range: bytes {first}-{last}/{}\r\nContent-Length: {}\r\n\r\n",
+                            body.len(),
+                            part.len()
+                        )
+                        .into_bytes();
+                        r.extend_from_slice(part);
+                        r
+                    }
+                    None => {
+                        let mut r = format!(
+                            "HTTP/1.1 200 OK\r\n{head}\r\nContent-Length: {}\r\n\r\n",
+                            body.len()
+                        )
+                        .into_bytes();
+                        r.extend_from_slice(body);
+                        r
+                    }
+                };
+                socket.write_all(&response).await.unwrap();
+            }
+        });
+        Moodle::new(Url::parse(&root).unwrap()).account("TOKEN".into())
+    }
+
+    #[tokio::test]
+    async fn downloads_files_in_parts() {
+        const BODY: &[u8] = b"0123456789";
+        for ranges in [true, false] {
+            let account = serve(BODY, ranges).await;
+            let file_url = format!(
+                "{}webservice/pluginfile.php/1/a.bin",
+                account.moodle.wwwroot()
+            );
+            let request = |offset, max_bytes| DownloadFileRequest {
+                file_url: file_url.clone(),
+                offset,
+                max_bytes,
+            };
+            let chunk = account.download_file(request(0, 4)).await.unwrap();
+            assert_eq!(
+                (chunk.filename.as_str(), chunk.mime.as_str()),
+                ("a.bin", "application/octet-stream")
+            );
+            assert_eq!(
+                (chunk.bytes.as_slice(), chunk.size, chunk.next_offset),
+                (&b"0123"[..], Some(10), Some(4))
+            );
+            let chunk = account.download_file(request(4, 6)).await.unwrap();
+            assert_eq!(
+                (chunk.bytes.as_slice(), chunk.next_offset),
+                (&b"456789"[..], None)
+            );
+            let chunk = account.download_file(request(8, 100)).await.unwrap();
+            assert_eq!(
+                (chunk.bytes.as_slice(), chunk.next_offset),
+                (&b"89"[..], None)
+            );
+            let error = account.download_file(request(10, 4)).await.unwrap_err();
+            assert!(matches!(error, Error::NotAllowed(_)), "{ranges}: {error}");
+        }
     }
 
     #[test]

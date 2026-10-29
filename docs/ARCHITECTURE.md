@@ -136,7 +136,7 @@ include ids needed for follow-up calls, unix times → RFC 3339).
 | `list_conversations` | read | `list_conversations(ConversationsRequest{limit?})` → `core_message_get_conversations` |
 | `get_conversation_messages` | read | `get_conversation_messages(ConversationRequest{conversation_id, limit?})` → `core_message_get_conversation_messages` |
 | `get_module` | read | `get_module(ModuleRequest{course_id, cmid})` → page/url/resource/label body: `mod_page_get_pages_by_courses`, `mod_url_get_urls_by_courses`, `mod_resource_get_resources_by_courses` (filter by `coursemodule`) |
-| `read_file` | read | `read_file(ReadFileRequest{file_url, max_chars?})` → `FileContent` (see below) |
+| `read_file` | read | `read_file(ReadFileRequest{file_url, max_chars?, mode: text|link = text})` → `FileContent` (see below) |
 | `submit_assignment` | write | `submit_assignment(SubmitAssignmentRequest{assignment_id, online_text?, files?: [{filename, text?, base64?}], submit_for_grading: bool = false})` → `upload.php` + `mod_assign_save_submission` (+ `mod_assign_submit_for_grading` with `acceptsubmissionstatement=1`) |
 | `reply_forum_post` | write | `reply_forum_post(ReplyRequest{post_id, subject?, message})` → `mod_forum_add_discussion_post` |
 | `create_forum_discussion` | write | `create_forum_discussion(NewDiscussionRequest{forum_id, subject, message})` → `mod_forum_add_discussion` |
@@ -149,7 +149,8 @@ Not provided: quiz attempts, iLearning internal mail.
 `Text {filename, mime, text, truncated}` for pdf (pdf-extract), docx/pptx/xlsx
 (zip + quick-xml), txt/md/csv/html (html → text); `Image {filename, mime,
 bytes}` for png/jpeg/gif/webp ≤ 5 MB; `Binary {filename, mime, size,
-file_url}` otherwise (e.g. legacy .ppt/.doc). The server turns `Binary` into a
+file_url}` otherwise (e.g. legacy .ppt/.doc), and for every file with
+`mode: link` (the original bytes, without downloading the body). The server turns `Binary` into a
 link `<PUBLIC_URL>/files/<signed>` (HMAC with a key derived from
 `ENCRYPTION_KEY`, payload `{user_id, file_url, exp: now+1h}`) that streams via
 `Account::download`.

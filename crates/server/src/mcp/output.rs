@@ -63,8 +63,9 @@ impl Output {
                 let download_url = link(&file_url);
                 let logged = json!({ "filename": filename, "mime": mime, "size": size });
                 let text = format!(
-                    "{filename} ({mime}, {size} bytes) cannot be converted to text. Download \
-                     link, valid for one hour, to give the user or fetch: {download_url}"
+                    "{filename} ({mime}, {size} bytes) is not returned as text or an image. \
+                     Download link to the original file, valid for one hour, to give the user \
+                     or fetch: {download_url}"
                 );
                 (success(text), Some(logged))
             }

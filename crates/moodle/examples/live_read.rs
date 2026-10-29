@@ -239,6 +239,7 @@ async fn main() {
             .read_file(ReadFileRequest {
                 file_url,
                 max_chars: 20_000,
+                mode: ReadMode::Text,
             })
             .await;
         let elapsed = started.elapsed().as_millis();
@@ -275,6 +276,7 @@ async fn main() {
         .read_file(ReadFileRequest {
             file_url: "https://example.com/webservice/pluginfile.php/1/x.pdf".into(),
             max_chars: 10,
+            mode: ReadMode::Text,
         })
         .await;
     println!(

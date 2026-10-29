@@ -12,7 +12,7 @@ use url::Url;
 use crate::Account;
 use crate::error::{Error, Result};
 use crate::text::{self, Get};
-use crate::types::ReadFileRequest;
+use crate::types::{ReadFileRequest, ReadMode};
 
 /// Largest image [`Account::read_file`] returns inline.
 pub const MAX_IMAGE_BYTES: usize = 5 * 1024 * 1024;
@@ -63,7 +63,8 @@ pub enum FileContent {
         #[serde(skip)]
         bytes: Vec<u8>,
     },
-    /// Anything else; the caller should offer a download link.
+    /// Anything else, or any file in [`ReadMode::Link`]; the caller should
+    /// offer a download link.
     Binary {
         filename: String,
         mime: String,
@@ -184,12 +185,16 @@ impl Account {
     }
 
     /// Reads a file for an agent: text for documents, the bytes for small
-    /// images, otherwise a description to link to.
+    /// images, otherwise (or always, in [`ReadMode::Link`]) a description
+    /// to link to.
     pub async fn read_file(&self, request: ReadFileRequest) -> Result<FileContent> {
         let response = self.download_response(&request.file_url).await?;
         let (filename, mime) = describe(&response);
         let size = response.content_length();
-        let kind = Kind::of(&filename, &mime);
+        let kind = match request.mode {
+            ReadMode::Text => Kind::of(&filename, &mime),
+            ReadMode::Link => Kind::Binary,
+        };
         let limit = match kind {
             Kind::Image => MAX_IMAGE_BYTES as u64,
             Kind::Binary => 0,

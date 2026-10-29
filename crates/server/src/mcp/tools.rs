@@ -253,7 +253,9 @@ static TOOLS: LazyLock<Vec<Tool>> = LazyLock::new(|| {
             "Read a course file",
             "Reads an iLearning file by its `fileurl`: text of PDF, Word, PowerPoint, Excel and \
              text files (up to `max_chars`), images as images, and a download link valid for \
-             one hour for anything else.",
+             one hour for anything else. With mode=\"link\" it returns that download link for \
+             any file, to get the original bytes (e.g. to convert a document, or when its text \
+             misses equations, images or layout).",
             |a: Account, r: ReadFileRequest| async move { a.read_file(r).await },
         ),
         Tool::new(

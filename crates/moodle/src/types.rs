@@ -183,7 +183,8 @@ pub struct ModuleRequest {
 
 /// Read a file from iLearning: text of PDF, Word, PowerPoint, Excel, text
 /// and HTML files; images are returned as images; other files (videos,
-/// legacy .ppt/.doc, archives) as a download link.
+/// legacy .ppt/.doc, archives) as a download link. With `mode: "link"`,
+/// always a download link to the original file.
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
 pub struct ReadFileRequest {
     /// A `fileurl` from another tool's result (an iLearning
@@ -193,6 +194,19 @@ pub struct ReadFileRequest {
     #[serde(default = "default_max_chars")]
     #[schemars(range(min = 1))]
     pub max_chars: u32,
+    /// `text` (default): the file's content where it can be read. `link`:
+    /// a download link to the original bytes, e.g. to convert the file or
+    /// when the extracted text misses equations or images.
+    #[serde(default)]
+    pub mode: ReadMode,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum ReadMode {
+    #[default]
+    Text,
+    Link,
 }
 
 /// Save the user's submission for an assignment: online text and/or files.
@@ -291,7 +305,10 @@ mod tests {
             serde_json::from_value(json!({"classification": "past"})).unwrap();
         assert_eq!(r.classification.as_str(), "past");
         let r: ReadFileRequest = serde_json::from_value(json!({"file_url": "x"})).unwrap();
-        assert_eq!(r.max_chars, 100_000);
+        assert_eq!((r.max_chars, r.mode), (100_000, ReadMode::Text));
+        let r: ReadFileRequest =
+            serde_json::from_value(json!({"file_url": "x", "mode": "link"})).unwrap();
+        assert_eq!(r.mode, ReadMode::Link);
         let r: SubmitAssignmentRequest =
             serde_json::from_value(json!({"assignment_id": 3})).unwrap();
         assert!(!r.submit_for_grading && r.files.is_empty() && r.online_text.is_none());

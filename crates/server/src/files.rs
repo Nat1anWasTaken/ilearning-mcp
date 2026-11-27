@@ -146,6 +146,9 @@ pub async fn download(
             tracing::warn!(error = %err, "downloading an iLearning file");
             (StatusCode::BAD_GATEWAY, format!("iLearning: {err}")).into_response()
         }
+        Err(CallError::Unavailable(message)) => {
+            (StatusCode::SERVICE_UNAVAILABLE, message).into_response()
+        }
         Err(CallError::Internal(err)) => {
             tracing::error!(error = ?err, "loading the iLearning account for a download");
             StatusCode::INTERNAL_SERVER_ERROR.into_response()

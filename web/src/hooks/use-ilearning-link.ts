@@ -1,6 +1,7 @@
-import { useMutation } from "@tanstack/react-query"
+import { useMutation, useQueryClient } from "@tanstack/react-query"
+import { api, meQueryKey } from "@nat1an/mcp-backbone-dashboard"
 
-import { api, type LinkStart } from "@/lib/api"
+import type { LinkStart } from "@/lib/types"
 
 /** `POST /auth/ilearning/start`: a new link attempt (works signed in or out). */
 export function useStartLink() {
@@ -12,10 +13,15 @@ export function useStartLink() {
 
 /** `POST /auth/ilearning/complete`; navigates away on success. */
 export function useCompleteLink() {
+  const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (body: { attempt_id: string; pasted: string }) =>
       api.post<{ redirect_to: string }>("/auth/ilearning/complete", body),
-    // A full navigation: `redirect_to` may continue an /oauth/authorize flow.
-    onSuccess: ({ redirect_to }) => window.location.assign(redirect_to),
+    onSuccess: async ({ redirect_to }) => {
+      // The user and link just changed.
+      await queryClient.invalidateQueries({ queryKey: meQueryKey })
+      // A full navigation: `redirect_to` may continue an /oauth/authorize flow.
+      window.location.assign(redirect_to)
+    },
   })
 }

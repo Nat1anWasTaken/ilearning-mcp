@@ -16,9 +16,15 @@ behalf of each signed-in student.
   text extraction), deadlines, assignments and submission, grades, forums,
   notifications and messages. Write tools are annotated so clients confirm
   them with you.
+- **Control** each connected client from the dashboard: turn it off, make it
+  read-only, limit it to some tools, or send its write calls (submissions,
+  forum posts, messages) to your outbox to review, edit and approve first,
+  with push notifications.
 - **Audit** every tool call, and rename or disconnect connected clients.
 
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the design and the
+The OAuth server, permissions, outbox, call log and dashboard come from
+[mcp-backbone](https://github.com/Nat1anWasTaken/mcp-backbone). See
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the design and the
 dashboard API contract.
 
 ## Development
@@ -53,7 +59,7 @@ cd web && pnpm lint && pnpm build
 | `DATABASE_URL` | Postgres connection string. |
 | `ENCRYPTION_KEY` | 32 bytes, base64 (`openssl rand -base64 32`). It encrypts iLearning tokens at rest and signs file download links. |
 | `ILEARNING_URL` | The Moodle site (default `https://ilearning.cycu.edu.tw`). |
-| `ALLOWED_MOODLE_USERNAMES` | Comma-separated Moodle usernames allowed to sign in. Leave it empty to allow anyone with an iLearning account. |
+| `ALLOWED_USERS` | Comma-separated Moodle usernames allowed to sign in. Leave it empty to allow anyone with an iLearning account. `ALLOWED_MOODLE_USERNAMES`, its older name, is read when it is not set. |
 | `TOKEN_DURATION_DAYS` | Assumed lifetime of a fresh iLearning token (default 84, Moodle's default). |
 | `BIND_ADDR`, `WEB_DIST` | Listen address (default `0.0.0.0:8080`) and dashboard build directory (default `web/dist`). |
 

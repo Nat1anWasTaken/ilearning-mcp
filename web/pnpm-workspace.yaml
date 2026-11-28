@@ -2,3 +2,8 @@ packages: []
 
 allowBuilds:
   esbuild: true
+
+# Our own framework package: take its releases as soon as they are out, so
+# a fix reaches this service without the usual release-age wait.
+minimumReleaseAgeExclude:
+  - "@nat1an/mcp-backbone-dashboard"

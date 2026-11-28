@@ -1964,7 +1964,9 @@ checksum = "47e1ffaa40ddd1f3ed91f717a33c8c0ee23fff369e3aa8772b9605cc1d22f4c3"
 
 [[package]]
 name = "mcp-backbone"
-version = "0.1.0"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "484d95d81a5da58bf44694773db070eb1f543c762301630e2e37f32173a8cefd"
 dependencies = [
  "aes-gcm 0.10.3",
  "anyhow",

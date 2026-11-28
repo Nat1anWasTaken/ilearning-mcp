@@ -14,7 +14,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@nat1an/mcp-backbone-dashboard": "^0.1.0",
+    "@nat1an/mcp-backbone-dashboard": "^0.1.2",
     "@tanstack/react-query": "^5.104.1",
     "lucide-react": "^1.55.0",
     "react": "^19.3.0",
